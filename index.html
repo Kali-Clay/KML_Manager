@@ -194,7 +194,7 @@
     display: flex;
     align-items: flex-end;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 20px;
   }
   .filename-row .field-group { flex: 2; }
   .small-btn {
@@ -362,10 +362,16 @@
     margin-top: 12px;
     text-align: center;
     font-family: 'Space Mono', monospace;
-    font-size: 9px;
+    font-size: 14px;
     color: var(--muted);
   }
-  .creator span { color: var(--accent); }
+  .creator a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .creator a:hover {
+    text-decoration: underline;
+  }
 </style>
 </head>
 <body>
@@ -386,24 +392,27 @@
   <!-- Correction Panel (only visible in TXT mode) -->
   <div class="correction-panel" id="correctionPanel">
     <div class="correction-header" onclick="toggleCorrection()">
-      <span class="correction-title">⚙ COORDINATE CORRECTION & EXPORT</span>
+      <span class="correction-title">⚙ COORDINATE CORRECTION (TXT only)</span>
       <span class="correction-toggle" id="corrToggle">[expand]</span>
     </div>
     <div class="correction-body" id="corrBody">
-      <p class="correction-note">
-        Offsets apply to TXT conversion only. For KML merger, no offsets needed.
-      </p>
+      <p class="correction-note">Offsets apply only to TXT conversion.</p>
       <div class="offset-grid">
         <div class="field-group"><label>Lat Offset</label><input type="number" id="latOffset" value="0" step="0.00001"></div>
         <div class="field-group"><label>Lon Offset</label><input type="number" id="lonOffset" value="0" step="0.00001"></div>
         <div class="field-group"><label>Alt Offset (m)</label><input type="number" id="altOffset" value="0" step="0.5"></div>
       </div>
-      <div class="filename-row">
-        <div class="field-group"><label>KML FILENAME</label><input type="text" id="kmlFilename" value="RS10_output.kml"></div>
-        <button type="button" class="small-btn" id="resetFilenameBtn">⟳ Default</button>
-      </div>
       <button class="btn-reset-correction" onclick="resetCorrection()">↺ Reset offsets to zero</button>
     </div>
+  </div>
+
+  <!-- Filename row (always visible) -->
+  <div class="filename-row">
+    <div class="field-group" style="flex: 2;">
+      <label>OUTPUT KML FILENAME</label>
+      <input type="text" id="kmlFilename" value="RS10_output.kml">
+    </div>
+    <button type="button" class="small-btn" id="resetFilenameBtn">⟳ Default</button>
   </div>
 
   <!-- TXT mode zone -->
@@ -436,8 +445,9 @@
   </div>
   <div class="result" id="result"><div class="result-title">// FILE READY</div><a class="btn-download" id="btnDownload">⬇ Download KML</a></div>
   <div class="reset-link" id="resetLink" onclick="resetAll()">← start over</div>
-  <div class="footer">OFFLINE · TXT merge + KML merge</div>
-  <div class="creator">DESIGNED &amp; BUILT BY <span>Eng. Sahand</span></div>
+
+  <div class="footer"></div>
+  <div class="creator">DESIGNED &amp; BUILT BY <a href="https://t.me/eng_sahand" target="_blank" rel="noopener noreferrer"><span>Eng. Sahand</span></a></div>
 </div>
 
 <script>
@@ -648,7 +658,7 @@
     <Placemark><name>End</name><styleUrl>#endPin</styleUrl><Point><coordinates>${end[0]},${end[1]},${end[2]}</coordinates></Point></Placemark>
   </Document>
 </kml>`;
-    return { kml: kmlContent, pointsCount: points.length, duration: durationMin, avgAlt: avgAlt };
+    return { kml: kmlContent, pointsCount: points.length, duration: durationMin, avgAlt: avgAlt, filename: desiredFilename };
   }
 
   // ==================== KML Merger ====================
@@ -710,7 +720,7 @@
         const blob = new Blob([result.kml], { type: 'application/vnd.google-earth.kml+xml' });
         const url = URL.createObjectURL(blob);
         btnDownload.href = url;
-        btnDownload.download = ensureKmlExtension(kmlFilenameInput.value);
+        btnDownload.download = result.filename;
         resultDiv.classList.add('visible');
       } 
       else { // KML merge mode
@@ -765,6 +775,11 @@
   const corrToggle = document.getElementById('corrToggle');
   corrBody.classList.remove('open');
   corrToggle.textContent = '[expand]';
+
+  // Expose globals for inline handlers
+  window.toggleCorrection = toggleCorrection;
+  window.resetCorrection = resetCorrection;
+  window.resetAll = resetAll;
 </script>
 </body>
 </html>

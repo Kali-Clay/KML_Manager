@@ -17,7 +17,6 @@
     --muted: #5a5a7a;
     --success: #00ff88;
     --error: #ff3860;
-    --warning: #ffb86b;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -32,7 +31,6 @@
     align-items: center;
     justify-content: center;
     padding: 24px 16px;
-    overflow-x: hidden;
   }
 
   body::before {
@@ -49,7 +47,7 @@
 
   .container {
     width: 100%;
-    max-width: 560px;
+    max-width: 580px;
     position: relative;
     z-index: 1;
   }
@@ -86,22 +84,22 @@
     letter-spacing: 1px;
   }
 
-  /* Mode switcher */
-  .mode-switch {
+  /* Mode Tabs */
+  .mode-tabs {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 6px;
     margin-bottom: 20px;
   }
-  .mode-btn {
+  .tab-btn {
     flex: 1;
     text-align: center;
-    padding: 8px;
+    padding: 10px;
     font-family: 'Space Mono', monospace;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 1px;
     background: transparent;
@@ -112,7 +110,7 @@
     transition: all 0.2s;
     text-transform: uppercase;
   }
-  .mode-btn.active {
+  .tab-btn.active {
     background: var(--accent);
     color: #000;
   }
@@ -125,7 +123,6 @@
     padding: 16px;
     margin-bottom: 20px;
     position: relative;
-    overflow: hidden;
   }
   .correction-panel::before {
     content: '';
@@ -139,7 +136,6 @@
     align-items: center;
     justify-content: space-between;
     cursor: pointer;
-    user-select: none;
   }
   .correction-title {
     font-family: 'Space Mono', monospace;
@@ -163,7 +159,6 @@
     font-size: 9px;
     color: var(--muted);
     margin-bottom: 16px;
-    line-height: 1.6;
     border-left: 2px solid var(--accent2);
     padding-left: 10px;
   }
@@ -182,7 +177,6 @@
     font-size: 9px;
     color: var(--muted);
     letter-spacing: 2px;
-    text-transform: uppercase;
     margin-bottom: 5px;
   }
   .field-group input {
@@ -234,7 +228,6 @@
     transition: all 0.2s;
     background: var(--surface);
     margin-bottom: 16px;
-    position: relative;
   }
   .dropzone.drag-over {
     border-color: var(--accent);
@@ -275,7 +268,6 @@
     letter-spacing: 1px;
     cursor: pointer;
     text-transform: uppercase;
-    transition: 0.1s;
   }
   .btn-convert:disabled {
     background: var(--border);
@@ -382,25 +374,24 @@
   <div class="header">
     <div class="badge">CHCNAV RS10</div>
     <h1>TRAJ<span>→</span>KML</h1>
-    <p class="subtitle">// merge, correct & convert gnss_valid_trajectory</p>
+    <p class="subtitle">// convert, merge & combine trajectory files</p>
   </div>
 
-  <!-- Mode Switch -->
-  <div class="mode-switch" id="modeSwitch">
-    <button class="mode-btn active" data-mode="single">📄 SINGLE FILE</button>
-    <button class="mode-btn" data-mode="merge">🔗 MERGE FILES</button>
+  <!-- Mode Tabs -->
+  <div class="mode-tabs" id="modeTabs">
+    <button class="tab-btn active" data-mode="txt">📄 TXT to KML</button>
+    <button class="tab-btn" data-mode="kml">🗺️ KML Merger</button>
   </div>
 
-  <!-- Correction Panel -->
-  <div class="correction-panel">
+  <!-- Correction Panel (only visible in TXT mode) -->
+  <div class="correction-panel" id="correctionPanel">
     <div class="correction-header" onclick="toggleCorrection()">
       <span class="correction-title">⚙ COORDINATE CORRECTION & EXPORT</span>
       <span class="correction-toggle" id="corrToggle">[expand]</span>
     </div>
     <div class="correction-body" id="corrBody">
       <p class="correction-note">
-        RS10 stores LON / LAT as columns 3 & 4. Offsets fine-tune position.<br>
-        Altitude offset shifts height. Filename sets output KML name.
+        Offsets apply to TXT conversion only. For KML merger, no offsets needed.
       </p>
       <div class="offset-grid">
         <div class="field-group"><label>Lat Offset</label><input type="number" id="latOffset" value="0" step="0.00001"></div>
@@ -408,62 +399,58 @@
         <div class="field-group"><label>Alt Offset (m)</label><input type="number" id="altOffset" value="0" step="0.5"></div>
       </div>
       <div class="filename-row">
-        <div class="field-group"><label>KML FILENAME</label><input type="text" id="kmlFilename" value="RS10_trajectory.kml"></div>
+        <div class="field-group"><label>KML FILENAME</label><input type="text" id="kmlFilename" value="RS10_output.kml"></div>
         <button type="button" class="small-btn" id="resetFilenameBtn">⟳ Default</button>
       </div>
       <button class="btn-reset-correction" onclick="resetCorrection()">↺ Reset offsets to zero</button>
     </div>
   </div>
 
-  <!-- Single file dropzone -->
-  <div id="singleZone" class="dropzone">
+  <!-- TXT mode zone -->
+  <div id="txtZone" class="dropzone">
     <span class="dropzone-icon">📡</span>
-    <div class="dropzone-label">Drop file here or tap to browse</div>
-    <div class="dropzone-sub">gnss_valid_trajectory.txt</div>
-    <input type="file" id="singleFileInput" accept=".txt" class="file-input">
+    <div class="dropzone-label">Drop TXT file(s) here or tap to browse</div>
+    <div class="dropzone-sub">gnss_valid_trajectory.txt (single or multiple for merge)</div>
+    <input type="file" id="txtFileInput" accept=".txt" multiple class="file-input">
   </div>
+  <div id="txtFileList" class="file-list" style="display: none;"></div>
 
-  <!-- Merge files zone (hidden initially) -->
-  <div id="mergeZone" style="display: none;">
-    <div class="dropzone" id="mergeDropzone">
-      <span class="dropzone-icon">🔗📄</span>
-      <div class="dropzone-label">Drop multiple .txt files or tap to select</div>
-      <div class="dropzone-sub">select 2 or more trajectory files</div>
-      <input type="file" id="multiFileInput" accept=".txt" multiple class="file-input">
+  <!-- KML mode zone (hidden initially) -->
+  <div id="kmlZone" style="display: none;">
+    <div class="dropzone" id="kmlDropzone">
+      <span class="dropzone-icon">🗺️</span>
+      <div class="dropzone-label">Drop KML file(s) here or tap to browse</div>
+      <div class="dropzone-sub">select multiple .kml files to merge into one</div>
+      <input type="file" id="kmlFileInput" accept=".kml" multiple class="file-input">
     </div>
-    <div id="fileListContainer" class="file-list" style="display: none;"></div>
+    <div id="kmlFileList" class="file-list" style="display: none;"></div>
   </div>
 
-  <!-- File info (single) -->
-  <div class="file-info" id="fileInfo" style="display: none;">
-    <span>✅</span><span class="fname" id="fileName"></span>
-  </div>
-
-  <button class="btn-convert" id="btnConvert" disabled>Convert to KML</button>
+  <button class="btn-convert" id="btnConvert" disabled>Convert / Merge</button>
   <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
   <div class="error-msg" id="errorMsg"></div>
   <div class="stats" id="stats">
-    <div class="stat-card"><span class="stat-value" id="statPoints">—</span><span class="stat-label">Points</span></div>
+    <div class="stat-card"><span class="stat-value" id="statPoints">—</span><span class="stat-label">Tracks / Points</span></div>
     <div class="stat-card"><span class="stat-value" id="statDuration">—</span><span class="stat-label">Duration (min)</span></div>
     <div class="stat-card"><span class="stat-value" id="statAlt">—</span><span class="stat-label">Avg Alt (m)</span></div>
   </div>
-  <div class="result" id="result"><div class="result-title">// KML READY</div><a class="btn-download" id="btnDownload">⬇ Download KML</a></div>
-  <div class="reset-link" id="resetLink" onclick="resetAll()">← convert another file</div>
-  <div class="footer">OFFLINE · MERGE + CORRECT · MULTI-FILE SUPPORT</div>
+  <div class="result" id="result"><div class="result-title">// FILE READY</div><a class="btn-download" id="btnDownload">⬇ Download KML</a></div>
+  <div class="reset-link" id="resetLink" onclick="resetAll()">← start over</div>
+  <div class="footer">OFFLINE · TXT merge + KML merge</div>
   <div class="creator">DESIGNED &amp; BUILT BY <span>Eng. Sahand</span></div>
 </div>
 
 <script>
-  // -------------------- DOM elements --------------------
-  const modeBtns = document.querySelectorAll('.mode-btn');
-  const singleZone = document.getElementById('singleZone');
-  const mergeZone = document.getElementById('mergeZone');
-  const singleFileInput = document.getElementById('singleFileInput');
-  const multiFileInput = document.getElementById('multiFileInput');
-  const mergeDropzone = document.getElementById('mergeDropzone');
-  const fileListContainer = document.getElementById('fileListContainer');
-  const fileInfo = document.getElementById('fileInfo');
-  const fileNameSpan = document.getElementById('fileName');
+  // DOM elements
+  const modeTabs = document.querySelectorAll('.tab-btn');
+  const txtZone = document.getElementById('txtZone');
+  const kmlZone = document.getElementById('kmlZone');
+  const txtFileInput = document.getElementById('txtFileInput');
+  const kmlFileInput = document.getElementById('kmlFileInput');
+  const txtDropzone = document.getElementById('txtZone');
+  const kmlDropzone = document.getElementById('kmlDropzone');
+  const txtFileListDiv = document.getElementById('txtFileList');
+  const kmlFileListDiv = document.getElementById('kmlFileList');
   const btnConvert = document.getElementById('btnConvert');
   const progressBar = document.getElementById('progressBar');
   const progressFill = document.getElementById('progressFill');
@@ -472,28 +459,31 @@
   const resultDiv = document.getElementById('result');
   const btnDownload = document.getElementById('btnDownload');
   const resetLink = document.getElementById('resetLink');
+  const correctionPanel = document.getElementById('correctionPanel');
 
   // Inputs
   const latOffsetInput = document.getElementById('latOffset');
   const lonOffsetInput = document.getElementById('lonOffset');
   const altOffsetInput = document.getElementById('altOffset');
   const kmlFilenameInput = document.getElementById('kmlFilename');
-  const resetFilenameBtn = document.getElementById('resetFilenameBtn');
 
   // State
-  let currentMode = 'single';    // 'single' or 'merge'
-  let selectedFiles = [];         // for merge mode: array of File objects
-  let kmlBlob = null;
+  let currentMode = 'txt';    // 'txt' or 'kml'
+  let txtFiles = [];           // array of File objects for TXT mode
+  let kmlFiles = [];           // array of File objects for KML mode
 
   // Helper: ensure .kml extension
   function ensureKmlExtension(name) {
     let trimmed = name.trim();
-    if (trimmed === "") return "RS10_trajectory.kml";
+    if (trimmed === "") return "RS10_output.kml";
     if (!trimmed.toLowerCase().endsWith('.kml')) trimmed += '.kml';
     return trimmed;
   }
 
-  resetFilenameBtn.addEventListener('click', () => { kmlFilenameInput.value = "RS10_trajectory.kml"; });
+  // Reset filename to default
+  document.getElementById('resetFilenameBtn').addEventListener('click', () => {
+    kmlFilenameInput.value = "RS10_output.kml";
+  });
 
   function toggleCorrection() {
     const body = document.getElementById('corrBody');
@@ -508,261 +498,269 @@
   }
 
   // Mode switching
-  modeBtns.forEach(btn => {
+  modeTabs.forEach(btn => {
     btn.addEventListener('click', () => {
-      modeBtns.forEach(b => b.classList.remove('active'));
+      modeTabs.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentMode = btn.dataset.mode;
-      if (currentMode === 'single') {
-        singleZone.style.display = 'block';
-        mergeZone.style.display = 'none';
-        fileListContainer.style.display = 'none';
-        selectedFiles = [];
-        // reset UI state
-        fileInfo.style.display = 'none';
-        btnConvert.disabled = true;
-        resultDiv.classList.remove('visible');
-        statsDiv.classList.remove('visible');
-        errorMsg.classList.remove('visible');
+      if (currentMode === 'txt') {
+        txtZone.style.display = 'block';
+        kmlZone.style.display = 'none';
+        correctionPanel.style.display = 'block';
+        txtFileListDiv.style.display = txtFiles.length ? 'block' : 'none';
+        updateTxtFileList();
+        btnConvert.disabled = (txtFiles.length === 0);
       } else {
-        singleZone.style.display = 'none';
-        mergeZone.style.display = 'block';
-        fileInfo.style.display = 'none';
-        updateMergeFileList();
-        btnConvert.disabled = (selectedFiles.length === 0);
-        resultDiv.classList.remove('visible');
-        statsDiv.classList.remove('visible');
-        errorMsg.classList.remove('visible');
+        txtZone.style.display = 'none';
+        kmlZone.style.display = 'block';
+        correctionPanel.style.display = 'none';
+        kmlFileListDiv.style.display = kmlFiles.length ? 'block' : 'none';
+        updateKmlFileList();
+        btnConvert.disabled = (kmlFiles.length === 0);
       }
+      resultDiv.classList.remove('visible');
+      statsDiv.classList.remove('visible');
+      errorMsg.classList.remove('visible');
     });
   });
 
-  // Single file handlers
-  singleZone.addEventListener('click', () => singleFileInput.click());
-  singleZone.addEventListener('dragover', e => { e.preventDefault(); singleZone.classList.add('drag-over'); });
-  singleZone.addEventListener('dragleave', () => singleZone.classList.remove('drag-over'));
-  singleZone.addEventListener('drop', e => {
-    e.preventDefault();
-    singleZone.classList.remove('drag-over');
-    const f = e.dataTransfer.files[0];
-    if (f) handleSingleFile(f);
-  });
-  singleFileInput.addEventListener('change', e => {
-    if (e.target.files[0]) handleSingleFile(e.target.files[0]);
-  });
-
-  function handleSingleFile(file) {
-    selectedFiles = [file];
-    fileNameSpan.textContent = file.name;
-    fileInfo.style.display = 'flex';
-    singleZone.classList.add('has-file');
-    btnConvert.disabled = false;
-    errorMsg.classList.remove('visible');
-    resultDiv.classList.remove('visible');
-    statsDiv.classList.remove('visible');
-    resetLink.classList.remove('visible');
-  }
-
-  // Merge file handlers
-  mergeDropzone.addEventListener('click', () => multiFileInput.click());
-  mergeDropzone.addEventListener('dragover', e => { e.preventDefault(); mergeDropzone.classList.add('drag-over'); });
-  mergeDropzone.addEventListener('dragleave', () => mergeDropzone.classList.remove('drag-over'));
-  mergeDropzone.addEventListener('drop', e => {
-    e.preventDefault();
-    mergeDropzone.classList.remove('drag-over');
-    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.txt'));
-    if (files.length) addMergeFiles(files);
-  });
-  multiFileInput.addEventListener('change', e => {
-    if (e.target.files.length) addMergeFiles(Array.from(e.target.files));
-  });
-
-  function addMergeFiles(files) {
-    selectedFiles = files;
-    updateMergeFileList();
-    btnConvert.disabled = (selectedFiles.length === 0);
-    errorMsg.classList.remove('visible');
-    resultDiv.classList.remove('visible');
-    statsDiv.classList.remove('visible');
-  }
-
-  function updateMergeFileList() {
-    if (selectedFiles.length === 0) {
-      fileListContainer.style.display = 'none';
-      fileListContainer.innerHTML = '';
+  // TXT file handlers
+  function updateTxtFileList() {
+    if (txtFiles.length === 0) {
+      txtFileListDiv.style.display = 'none';
+      txtFileListDiv.innerHTML = '';
       return;
     }
-    fileListContainer.style.display = 'block';
-    fileListContainer.innerHTML = `<span>📁 ${selectedFiles.length} file(s) selected:</span>` + 
-      selectedFiles.map(f => `<span>• ${f.name}</span>`).join('');
+    txtFileListDiv.style.display = 'block';
+    txtFileListDiv.innerHTML = `<span>📁 ${txtFiles.length} TXT file(s):</span>` + 
+      txtFiles.map(f => `<span>• ${f.name}</span>`).join('');
   }
 
-  // -------------------- Core conversion logic (supports both modes) --------------------
-  btnConvert.addEventListener('click', async () => {
-    if (currentMode === 'single' && selectedFiles.length === 0) return;
-    if (currentMode === 'merge' && selectedFiles.length === 0) return;
+  function handleTxtFiles(files) {
+    txtFiles = files;
+    updateTxtFileList();
+    btnConvert.disabled = (txtFiles.length === 0);
+    errorMsg.classList.remove('visible');
+    resultDiv.classList.remove('visible');
+    statsDiv.classList.remove('visible');
+    txtDropzone.classList.add('has-file');
+  }
 
+  txtDropzone.addEventListener('click', () => txtFileInput.click());
+  txtDropzone.addEventListener('dragover', e => { e.preventDefault(); txtDropzone.classList.add('drag-over'); });
+  txtDropzone.addEventListener('dragleave', () => txtDropzone.classList.remove('drag-over'));
+  txtDropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    txtDropzone.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.txt'));
+    if (files.length) handleTxtFiles(files);
+  });
+  txtFileInput.addEventListener('change', e => {
+    if (e.target.files.length) handleTxtFiles(Array.from(e.target.files));
+  });
+
+  // KML file handlers
+  function updateKmlFileList() {
+    if (kmlFiles.length === 0) {
+      kmlFileListDiv.style.display = 'none';
+      kmlFileListDiv.innerHTML = '';
+      return;
+    }
+    kmlFileListDiv.style.display = 'block';
+    kmlFileListDiv.innerHTML = `<span>🗺️ ${kmlFiles.length} KML file(s):</span>` + 
+      kmlFiles.map(f => `<span>• ${f.name}</span>`).join('');
+  }
+
+  function handleKmlFiles(files) {
+    kmlFiles = files;
+    updateKmlFileList();
+    btnConvert.disabled = (kmlFiles.length === 0);
+    errorMsg.classList.remove('visible');
+    resultDiv.classList.remove('visible');
+    statsDiv.classList.remove('visible');
+    kmlDropzone.classList.add('has-file');
+  }
+
+  kmlDropzone.addEventListener('click', () => kmlFileInput.click());
+  kmlDropzone.addEventListener('dragover', e => { e.preventDefault(); kmlDropzone.classList.add('drag-over'); });
+  kmlDropzone.addEventListener('dragleave', () => kmlDropzone.classList.remove('drag-over'));
+  kmlDropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    kmlDropzone.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.kml'));
+    if (files.length) handleKmlFiles(files);
+  });
+  kmlFileInput.addEventListener('change', e => {
+    if (e.target.files.length) handleKmlFiles(Array.from(e.target.files));
+  });
+
+  // ==================== TXT to KML conversion (with optional merge) ====================
+  async function convertTxtToKml() {
     const latOffset = parseFloat(latOffsetInput.value) || 0;
     const lonOffset = parseFloat(lonOffsetInput.value) || 0;
     const altOffset = parseFloat(altOffsetInput.value) || 0;
     let desiredFilename = kmlFilenameInput.value.trim();
     desiredFilename = ensureKmlExtension(desiredFilename);
 
-    btnConvert.disabled = true;
-    btnConvert.textContent = 'Processing...';
-    progressBar.classList.add('visible');
-    progressFill.style.width = '5%';
-    errorMsg.classList.remove('visible');
-    resultDiv.classList.remove('visible');
-    statsDiv.classList.remove('visible');
-
-    try {
-      let allPointsRaw = []; // array of { ts, lon, lat, alt }
-      let fileCount = selectedFiles.length;
-
-      for (let idx = 0; idx < fileCount; idx++) {
-        const file = selectedFiles[idx];
-        const text = await readFileAsText(file);
-        progressFill.style.width = `${5 + (idx / fileCount) * 30}%`;
-        const lines = text.trim().split(/\r?\n/);
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const parts = line.trim().split(/\s+/);
-          if (parts.length < 5) continue;
-          const ts = parseFloat(parts[1]);
-          const lonRaw = parseFloat(parts[2]);
-          const latRaw = parseFloat(parts[3]);
-          const altRaw = parseFloat(parts[4]);
-          if (isNaN(ts) || isNaN(lonRaw) || isNaN(latRaw) || isNaN(altRaw)) continue;
-          allPointsRaw.push({
-            ts: ts,
-            lon: lonRaw + lonOffset,
-            lat: latRaw + latOffset,
-            alt: altRaw + altOffset
-          });
-        }
+    let allPointsRaw = [];
+    for (let idx = 0; idx < txtFiles.length; idx++) {
+      const file = txtFiles[idx];
+      const text = await readFileAsText(file);
+      const lines = text.trim().split(/\r?\n/);
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const parts = line.trim().split(/\s+/);
+        if (parts.length < 5) continue;
+        const ts = parseFloat(parts[1]);
+        const lonRaw = parseFloat(parts[2]);
+        const latRaw = parseFloat(parts[3]);
+        const altRaw = parseFloat(parts[4]);
+        if (isNaN(ts) || isNaN(lonRaw) || isNaN(latRaw) || isNaN(altRaw)) continue;
+        allPointsRaw.push({
+          ts: ts,
+          lon: lonRaw + lonOffset,
+          lat: latRaw + latOffset,
+          alt: altRaw + altOffset
+        });
       }
+    }
+    if (allPointsRaw.length === 0) throw new Error('No valid points found in TXT files.');
+    allPointsRaw.sort((a,b) => a.ts - b.ts);
+    const points = allPointsRaw.map(p => [p.lon, p.lat, p.alt]);
+    const minTs = allPointsRaw[0].ts;
+    const maxTs = allPointsRaw[allPointsRaw.length-1].ts;
+    const durationMin = ((maxTs - minTs) / 60).toFixed(1);
+    const avgAlt = (points.reduce((s,p) => s + p[2], 0) / points.length).toFixed(0);
 
-      if (allPointsRaw.length === 0) throw new Error('No valid points found in selected file(s).');
-
-      progressFill.style.width = '50%';
-      // Sort by timestamp (chronological order)
-      allPointsRaw.sort((a, b) => a.ts - b.ts);
-
-      const points = allPointsRaw.map(p => [p.lon, p.lat, p.alt]);
-      const minTs = allPointsRaw[0].ts;
-      const maxTs = allPointsRaw[allPointsRaw.length-1].ts;
-      const durationMin = ((maxTs - minTs) / 60).toFixed(1);
-      const altSum = points.reduce((sum, p) => sum + p[2], 0);
-      const avgAlt = (altSum / points.length).toFixed(0);
-
-      progressFill.style.width = '70%';
-      // Build KML
-      const coordsStr = points.map(([lon, lat, alt]) => `          ${lon},${lat},${alt}`).join('\n');
-      const startCoord = points[0];
-      const endCoord = points[points.length-1];
-      
-      const kmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+    const coordsStr = points.map(([lon,lat,alt]) => `          ${lon},${lat},${alt}`).join('\n');
+    const start = points[0];
+    const end = points[points.length-1];
+    const kmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>RS10 Trajectory ${currentMode === 'merge' ? '(merged)' : ''}</name>
-    <description>${points.length} GNSS points | ${durationMin} min | Alt offset: ${altOffset}m</description>
-    <Style id="traj">
-      <LineStyle><color>ff00e5ff</color><width>4</width></LineStyle>
-    </Style>
-    <Style id="startPin">
-      <IconStyle><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/grn-pushpin.png</href></Icon></IconStyle>
-    </Style>
-    <Style id="endPin">
-      <IconStyle><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/red-pushpin.png</href></Icon></IconStyle>
-    </Style>
-    <Placemark>
-      <name>Trajectory (3D path)</name>
-      <styleUrl>#traj</styleUrl>
-      <LineString>
-        <tessellate>1</tessellate>
-        <altitudeMode>absolute</altitudeMode>
-        <coordinates>
-${coordsStr}
-        </coordinates>
-      </LineString>
-    </Placemark>
-    <Placemark>
-      <name>Start point</name>
-      <styleUrl>#startPin</styleUrl>
-      <Point><coordinates>${startCoord[0]},${startCoord[1]},${startCoord[2]}</coordinates></Point>
-    </Placemark>
-    <Placemark>
-      <name>End point</name>
-      <styleUrl>#endPin</styleUrl>
-      <Point><coordinates>${endCoord[0]},${endCoord[1]},${endCoord[2]}</coordinates></Point>
-    </Placemark>
+    <name>RS10 Trajectory (merged)</name>
+    <description>${points.length} points | ${durationMin} min | Alt offset: ${altOffset}m</description>
+    <Style id="traj"><LineStyle><color>ff00e5ff</color><width>4</width></LineStyle></Style>
+    <Style id="startPin"><IconStyle><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/grn-pushpin.png</href></Icon></IconStyle></Style>
+    <Style id="endPin"><IconStyle><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/red-pushpin.png</href></Icon></IconStyle></Style>
+    <Placemark><name>Trajectory</name><styleUrl>#traj</styleUrl><LineString><tessellate>1</tessellate><altitudeMode>absolute</altitudeMode><coordinates>${coordsStr}</coordinates></LineString></Placemark>
+    <Placemark><name>Start</name><styleUrl>#startPin</styleUrl><Point><coordinates>${start[0]},${start[1]},${start[2]}</coordinates></Point></Placemark>
+    <Placemark><name>End</name><styleUrl>#endPin</styleUrl><Point><coordinates>${end[0]},${end[1]},${end[2]}</coordinates></Point></Placemark>
   </Document>
 </kml>`;
+    return { kml: kmlContent, pointsCount: points.length, duration: durationMin, avgAlt: avgAlt };
+  }
 
-      progressFill.style.width = '95%';
-      document.getElementById('statPoints').textContent = points.length.toLocaleString();
-      document.getElementById('statDuration').textContent = durationMin + 'm';
-      document.getElementById('statAlt').textContent = avgAlt;
-      statsDiv.classList.add('visible');
-
-      kmlBlob = new Blob([kmlContent], { type: 'application/vnd.google-earth.kml+xml' });
-      const url = URL.createObjectURL(kmlBlob);
-      btnDownload.href = url;
-      btnDownload.download = desiredFilename;
-      resultDiv.classList.add('visible');
-      resetLink.classList.add('visible');
-      btnConvert.textContent = 'Done ✓';
-      progressFill.style.width = '100%';
-      btnConvert.disabled = false;
-    } catch (err) {
-      errorMsg.textContent = '⚠ ' + err.message;
-      errorMsg.classList.add('visible');
-      btnConvert.disabled = false;
-      btnConvert.textContent = 'Convert to KML';
-      progressBar.classList.remove('visible');
-      progressFill.style.width = '0%';
+  // ==================== KML Merger ====================
+  async function mergeKmlFiles() {
+    let allPlacemarks = [];
+    let totalTracks = 0;
+    for (let idx = 0; idx < kmlFiles.length; idx++) {
+      const file = kmlFiles[idx];
+      const text = await readFileAsText(file);
+      // Extract all Placemark elements (simple regex, works for standard KML)
+      const placemarkRegex = /<Placemark[^>]*>([\s\S]*?)<\/Placemark>/gi;
+      let match;
+      while ((match = placemarkRegex.exec(text)) !== null) {
+        allPlacemarks.push(match[0]);
+        totalTracks++;
+      }
     }
-  });
+    if (allPlacemarks.length === 0) throw new Error('No Placemark elements found in selected KML files.');
+    const mergedKml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Merged KML (${kmlFiles.length} files)</name>
+    <description>${allPlacemarks.length} placemarks merged from ${kmlFiles.length} KML files.</description>
+    ${allPlacemarks.join('\n    ')}
+  </Document>
+</kml>`;
+    return { kml: mergedKml, tracksCount: allPlacemarks.length, filesCount: kmlFiles.length };
+  }
 
   function readFileAsText(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = e => resolve(e.target.result);
-      reader.onerror = e => reject(new Error('File read error: ' + file.name));
+      reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
       reader.readAsText(file);
     });
   }
 
-  function resetAll() {
-    // Reset everything
-    selectedFiles = [];
-    if (currentMode === 'single') {
-      singleFileInput.value = '';
-      fileInfo.style.display = 'none';
-      singleZone.classList.remove('has-file');
-    } else {
-      multiFileInput.value = '';
-      updateMergeFileList();
-    }
+  // Main action
+  btnConvert.addEventListener('click', async () => {
     btnConvert.disabled = true;
-    btnConvert.textContent = 'Convert to KML';
+    btnConvert.textContent = 'Processing...';
+    progressBar.classList.add('visible');
+    progressFill.style.width = '10%';
+    errorMsg.classList.remove('visible');
+    resultDiv.classList.remove('visible');
+    statsDiv.classList.remove('visible');
+
+    try {
+      if (currentMode === 'txt') {
+        if (txtFiles.length === 0) throw new Error('No TXT files selected.');
+        progressFill.style.width = '30%';
+        const result = await convertTxtToKml();
+        progressFill.style.width = '80%';
+        document.getElementById('statPoints').textContent = result.pointsCount.toLocaleString();
+        document.getElementById('statDuration').textContent = result.duration + 'm';
+        document.getElementById('statAlt').textContent = result.avgAlt;
+        statsDiv.classList.add('visible');
+        const blob = new Blob([result.kml], { type: 'application/vnd.google-earth.kml+xml' });
+        const url = URL.createObjectURL(blob);
+        btnDownload.href = url;
+        btnDownload.download = ensureKmlExtension(kmlFilenameInput.value);
+        resultDiv.classList.add('visible');
+      } 
+      else { // KML merge mode
+        if (kmlFiles.length === 0) throw new Error('No KML files selected.');
+        progressFill.style.width = '40%';
+        const result = await mergeKmlFiles();
+        progressFill.style.width = '80%';
+        document.getElementById('statPoints').textContent = result.tracksCount.toLocaleString();
+        document.getElementById('statDuration').textContent = `${result.filesCount} files`;
+        document.getElementById('statAlt').textContent = '—';
+        statsDiv.classList.add('visible');
+        const blob = new Blob([result.kml], { type: 'application/vnd.google-earth.kml+xml' });
+        const url = URL.createObjectURL(blob);
+        btnDownload.href = url;
+        btnDownload.download = ensureKmlExtension(kmlFilenameInput.value);
+        resultDiv.classList.add('visible');
+      }
+      progressFill.style.width = '100%';
+      btnConvert.textContent = 'Done ✓';
+      resetLink.classList.add('visible');
+    } catch (err) {
+      errorMsg.textContent = '⚠ ' + err.message;
+      errorMsg.classList.add('visible');
+      btnConvert.textContent = currentMode === 'txt' ? 'Convert to KML' : 'Merge KML';
+    } finally {
+      btnConvert.disabled = false;
+      setTimeout(() => { progressBar.classList.remove('visible'); progressFill.style.width = '0%'; }, 1000);
+    }
+  });
+
+  function resetAll() {
+    txtFiles = [];
+    kmlFiles = [];
+    txtFileInput.value = '';
+    kmlFileInput.value = '';
+    updateTxtFileList();
+    updateKmlFileList();
+    txtDropzone.classList.remove('has-file');
+    if (kmlDropzone) kmlDropzone.classList.remove('has-file');
+    btnConvert.disabled = true;
+    btnConvert.textContent = currentMode === 'txt' ? 'Convert to KML' : 'Merge KML';
     progressBar.classList.remove('visible');
     progressFill.style.width = '0%';
     statsDiv.classList.remove('visible');
     resultDiv.classList.remove('visible');
     resetLink.classList.remove('visible');
     errorMsg.classList.remove('visible');
-    if (kmlBlob) URL.revokeObjectURL(btnDownload.href);
-    kmlBlob = null;
   }
 
-  // expose global functions
-  window.toggleCorrection = toggleCorrection;
-  window.resetCorrection = resetCorrection;
-  window.resetAll = resetAll;
-
-  // initial collapse state
+  // Initial collapse
   const corrBody = document.getElementById('corrBody');
   const corrToggle = document.getElementById('corrToggle');
   corrBody.classList.remove('open');

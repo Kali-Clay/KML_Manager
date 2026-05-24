@@ -575,10 +575,16 @@
     const lonOffset = parseFloat(lonOffsetInput.value) || 0;
     const altOffset = parseFloat(altOffsetInput.value) || 0;
     const desiredFilename = ensureKmlExtension(kmlFilenameInput.value);
+    const CHUNK = 5000;
 
-    let allPointsRaw = [];
+    // Each file = its own independent track with its own Start/End pins
+    // NO cross-file connections
+    let allTracks = [];
+    let totalPoints = 0;
+
     for (const file of txtFiles) {
       const text = await readFileAsText(file);
+      let pts = [];
       for (const line of text.trim().split(/\r?\n/)) {
         if (!line.trim()) continue;
         const parts = line.trim().split(/\s+/);
@@ -588,26 +594,36 @@
         const lat = parseFloat(parts[3]) + latOffset;
         const alt = parseFloat(parts[4]) + altOffset;
         if (isNaN(ts) || isNaN(lon) || isNaN(lat) || isNaN(alt)) continue;
-        allPointsRaw.push({ ts, lon, lat, alt });
+        pts.push({ ts, lon, lat, alt });
       }
+      if (!pts.length) continue;
+      pts.sort((a,b) => a.ts - b.ts);
+      allTracks.push({ name: file.name.replace('.txt',''), pts });
+      totalPoints += pts.length;
     }
-    if (!allPointsRaw.length) throw new Error('No valid points found in TXT files.');
-    allPointsRaw.sort((a,b) => a.ts - b.ts);
 
-    const points = allPointsRaw.map(p => [p.lon, p.lat, p.alt]);
-    const durationMin = ((allPointsRaw[allPointsRaw.length-1].ts - allPointsRaw[0].ts) / 60).toFixed(1);
-    const avgAlt = (points.reduce((s,p) => s+p[2], 0) / points.length).toFixed(0);
-    const start = points[0]; const end = points[points.length-1];
+    if (!totalPoints) throw new Error('No valid points found in TXT files.');
 
-    // Chunk into segments of 5000 to avoid Google Earth Pro render limit
-    const CHUNK = 5000;
-    const chunks = [];
-    for (let i = 0; i < points.length; i += CHUNK) chunks.push(points.slice(i, i + CHUNK));
+    const avgAltAll = allTracks.flatMap(t => t.pts.map(p => p.alt));
+    const avgAlt = (avgAltAll.reduce((s,v) => s+v, 0) / avgAltAll.length).toFixed(0);
 
-    const segmentPlacemarks = chunks.map((chunk, i) => {
-      const coords = chunk.map(([lon,lat,alt]) => `          ${lon},${lat},${alt}`).join('\n');
-      return `  <Placemark>
-    <name>Segment ${i+1}</name>
+    let segIdx = 1;
+    let trackPlacemarks = [];
+
+    for (let ti = 0; ti < allTracks.length; ti++) {
+      const track = allTracks[ti];
+      const pts = track.pts;
+      const trackNum = ti + 1;
+      const start = pts[0];
+      const end = pts[pts.length - 1];
+      const dur = ((end.ts - start.ts) / 60).toFixed(1);
+
+      // Chunk this track independently
+      for (let i = 0; i < pts.length; i += CHUNK) {
+        const chunk = pts.slice(i, i + CHUNK);
+        const coords = chunk.map(p => `          ${p.lon},${p.lat},${p.alt}`).join('\n');
+        trackPlacemarks.push(`  <Placemark>
+    <name>Track ${trackNum} - Seg ${Math.floor(i/CHUNK)+1}</name>
     <styleUrl>#traj</styleUrl>
     <LineString>
       <tessellate>1</tessellate>
@@ -616,14 +632,34 @@
 ${coords}
       </coordinates>
     </LineString>
-  </Placemark>`;
-    }).join('\n');
+  </Placemark>`);
+      }
+
+      // Start pin for this track
+      trackPlacemarks.push(`  <Placemark>
+    <name>Track ${trackNum} Start</name>
+    <styleUrl>#startPin</styleUrl>
+    <Point><altitudeMode>clampToGround</altitudeMode><coordinates>${start.lon},${start.lat},${start.alt}</coordinates></Point>
+  </Placemark>`);
+
+      // End pin for this track
+      trackPlacemarks.push(`  <Placemark>
+    <name>Track ${trackNum} End</name>
+    <styleUrl>#endPin</styleUrl>
+    <Point><altitudeMode>clampToGround</altitudeMode><coordinates>${end.lon},${end.lat},${end.alt}</coordinates></Point>
+  </Placemark>`);
+    }
+
+    const totalDur = (() => {
+      const allTs = allTracks.flatMap(t => t.pts.map(p => p.ts));
+      return ((Math.max(...allTs) - Math.min(...allTs)) / 60).toFixed(1);
+    })();
 
     const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>RS10 Trajectory</name>
-    <description>${points.length} points | ${durationMin} min | ${chunks.length} segments | Alt offset: ${altOffset}m</description>
+    <name>RS10 Trajectories (${allTracks.length} tracks)</name>
+    <description>${totalPoints} total points | ${allTracks.length} separate tracks | Alt offset: ${altOffset}m</description>
     <Style id="traj">
       <LineStyle><color>ff00e5ff</color><width>4</width></LineStyle>
     </Style>
@@ -633,18 +669,10 @@ ${coords}
     <Style id="endPin">
       <IconStyle><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/red-pushpin.png</href></Icon></IconStyle>
     </Style>
-${segmentPlacemarks}
-  <Placemark>
-    <name>Start</name><styleUrl>#startPin</styleUrl>
-    <Point><altitudeMode>clampToGround</altitudeMode><coordinates>${start[0]},${start[1]},${start[2]}</coordinates></Point>
-  </Placemark>
-  <Placemark>
-    <name>End</name><styleUrl>#endPin</styleUrl>
-    <Point><altitudeMode>clampToGround</altitudeMode><coordinates>${end[0]},${end[1]},${end[2]}</coordinates></Point>
-  </Placemark>
+${trackPlacemarks.join('\n')}
   </Document>
 </kml>`;
-    return { kml, pointsCount: points.length, duration: durationMin, avgAlt, filename: desiredFilename };
+    return { kml, pointsCount: totalPoints, duration: totalDur, avgAlt, filename: desiredFilename };
   }
 
   async function mergeKmlFiles() {

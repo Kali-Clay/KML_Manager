@@ -648,11 +648,15 @@ ${segmentPlacemarks}
   }
 
   async function mergeKmlFiles() {
-    let allPoints = [];
-    let otherPlacemarks = [];
+    // Each file stays as its own track — no pooling across files
+    // so no fake straight line connecting end of file N to start of file N+1
+    let allFilePoints = []; // array of arrays, one per file
+    let allPins = [];       // start/end pins from each file kept as-is
+    let totalPoints = 0;
 
     for (const file of kmlFiles) {
       const text = await readFileAsText(file);
+      let filePoints = [];
       const pmRegex = /<Placemark[\s\S]*?<\/Placemark>/gi;
       let pm;
       while ((pm = pmRegex.exec(text)) !== null) {
@@ -662,23 +666,33 @@ ${segmentPlacemarks}
           if (coordMatch) {
             const lines = coordMatch[1].trim().split(/\s+/);
             for (const line of lines) {
-              if (line.trim()) allPoints.push(line.trim());
+              if (line.trim()) filePoints.push(line.trim());
             }
           }
         } else {
-          otherPlacemarks.push(block);
+          // Keep pins (Start/End markers) as-is
+          allPins.push(block);
         }
+      }
+      if (filePoints.length) {
+        allFilePoints.push({ name: file.name, points: filePoints });
+        totalPoints += filePoints.length;
       }
     }
 
-    if (!allPoints.length) throw new Error('No coordinate points found in selected KML files.');
+    if (!totalPoints) throw new Error('No coordinate points found in selected KML files.');
 
     const CHUNK = 5000;
-    const chunks = [];
-    for (let i = 0; i < allPoints.length; i += CHUNK) chunks.push(allPoints.slice(i, i + CHUNK));
+    let segmentIndex = 1;
+    let allSegmentPlacemarks = [];
 
-    const segmentPlacemarks = chunks.map((chunk, i) => `  <Placemark>
-    <name>Segment ${i+1}</name>
+    for (const fileTrack of allFilePoints) {
+      const pts = fileTrack.points;
+      // Chunk this file's points independently
+      for (let i = 0; i < pts.length; i += CHUNK) {
+        const chunk = pts.slice(i, i + CHUNK);
+        allSegmentPlacemarks.push(`  <Placemark>
+    <name>Segment ${segmentIndex++}</name>
     <styleUrl>#traj</styleUrl>
     <LineString>
       <tessellate>1</tessellate>
@@ -687,21 +701,23 @@ ${segmentPlacemarks}
           ${chunk.join('\n          ')}
       </coordinates>
     </LineString>
-  </Placemark>`).join('\n');
+  </Placemark>`);
+      }
+    }
 
     const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>Merged KML (${kmlFiles.length} files)</name>
-    <description>${allPoints.length} total points | ${chunks.length} segments | from ${kmlFiles.length} KML files</description>
+    <description>${totalPoints} total points | ${allSegmentPlacemarks.length} segments | ${kmlFiles.length} separate tracks</description>
     <Style id="traj">
       <LineStyle><color>ff00e5ff</color><width>4</width></LineStyle>
     </Style>
-${segmentPlacemarks}
-    ${otherPlacemarks.join('\n    ')}
+${allSegmentPlacemarks.join('\n')}
+    ${allPins.join('\n    ')}
   </Document>
 </kml>`;
-    return { kml, tracksCount: allPoints.length, filesCount: kmlFiles.length };
+    return { kml, tracksCount: totalPoints, filesCount: kmlFiles.length };
   }
 
   function readFileAsText(file) {

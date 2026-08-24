@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>RS10 → KML · Convert · Merge · Recolor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap');
+
+:root {
+  --bg:      #09090e;
+  --surf:    #111118;
+  --surf2:   #16161f;
+  --border:  #1d1d2b;
+  --border2: #252538;
+  --accent:  #00e5ff;
+  --orange:  #ff6b35;
+  --text:    #dddde8;
+  --muted:   #4e4e6a;
+  --dim:     #2a2a40;
+  --ok:      #00e87a;
+  --err:     #ff3860;
+}
+
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px 56px;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,.022) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none; z-index: 0;
+}
+
+.wrap {
+  width: 100%; max-width: 600px;
+  position: relative; z-index: 1;
+}
+
+/* ── HEADER ── */
+.header { margin-bottom: 36px; }
+.badge {
+  display: inline-block;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 3px;
+  color: var(--accent); border: 1px solid rgba(0,229,255,.4);
+  padding: 4px 10px; margin-bottom: 14px; text-transform: uppercase;
+}
+h1 {
+  font-size: clamp(36px, 9vw, 54px);
+  font-weight: 800; line-height: .95; letter-spacing: -2px;
+}
+h1 em { color: var(--accent); font-style: normal; }
+.sub {
+  margin-top: 10px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; color: var(--muted); letter-spacing: 2px;
+}
+
+/* ── TABS ── */
+.tabs {
+  display: flex; gap: 5px;
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px;
+  margin-bottom: 22px;
+}
+.tab {
+  flex: 1;
+  padding: 10px 4px;
+  background: transparent; border: none; border-radius: 3px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+  color: var(--muted); cursor: pointer;
+  transition: all .15s; text-transform: uppercase; text-align: center;
+  line-height: 1.4;
+}
+.tab.on { background: var(--accent); color: #000; }
+
+/* ── PANELS ── */
+.panel { display: none; }
+.panel.on { display: block; }
+
+/* ── CARD ── */
+.card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 16px;
+  margin-bottom: 13px;
+  position: relative;
+  overflow: hidden;
+}
+.card-head {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  cursor: pointer; user-select: none;
+}
+.card-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 2.5px;
+  color: var(--muted); text-transform: uppercase;
+}
+.card-title.orange { color: var(--orange); }
+.card-tog {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; color: var(--dim);
+}
+.card-body { display: none; margin-top: 14px; }
+.card-body.open { display: block; }
+
+/* orange accent line */
+.card.o::after {
+  content: '';
+  position: absolute; top: 0; left: 0;
+  width: 30px; height: 2px;
+  background: var(--orange);
+}
+/* cyan accent line */
+.card.c::after {
+  content: '';
+  position: absolute; top: 0; left: 0;
+  width: 30px; height: 2px;
+  background: var(--accent);
+}
+
+/* ── OFFSET GRID ── */
+.off-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px; margin-bottom: 12px;
+}
+.field { display: flex; flex-direction: column; }
+.field label {
+  font-family: 'Space Mono', monospace;
+  font-size: 8px; color: var(--muted);
+  letter-spacing: 2px; margin-bottom: 5px; text-transform: uppercase;
+}
+.field input {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 3px; padding: 8px;
+  color: var(--text);
+  font-family: 'Space Mono', monospace; font-size: 12px;
+  outline: none; width: 100%; transition: border-color .15s;
+}
+.field input:focus { border-color: var(--accent); }
+.text-btn {
+  background: none; border: none; padding: 0;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; color: var(--muted);
+  cursor: pointer; text-decoration: underline;
+}
+
+/* ── COLOR SWATCHES ── */
+.color-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 2px;
+  color: var(--muted); text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.sw {
+  width: 28px; height: 28px;
+  border-radius: 4px; cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform .1s, border-color .1s;
+  position: relative; flex-shrink: 0;
+}
+.sw:hover { transform: scale(1.18); }
+.sw.on {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.5);
+}
+.sw.on::after {
+  content: '✓';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: bold; color: rgba(0,0,0,.65);
+}
+
+/* ── DROPZONE ── */
+.drop {
+  border: 2px dashed var(--border2);
+  border-radius: 5px; padding: 28px 20px;
+  text-align: center; cursor: pointer;
+  transition: all .15s;
+  background: var(--surf); margin-bottom: 13px;
+}
+.drop:hover, .drop.over { border-color: var(--accent); background: rgba(0,229,255,.04); }
+.drop.got { border-color: var(--ok); border-style: solid; }
+.drop-icon { font-size: 24px; margin-bottom: 6px; display: block; }
+.drop-title { font-size: 13px; font-weight: 700; }
+.drop-sub {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; color: var(--muted); margin-top: 4px;
+}
+input[type="file"] { display: none; }
+
+/* ── FILE LIST ── */
+.flist {
+  background: rgba(0,229,255,.04);
+  border: 1px solid var(--border);
+  border-radius: 3px; padding: 10px 12px;
+  margin-bottom: 13px;
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  max-height: 90px; overflow-y: auto;
+  display: none;
+}
+.flist span { display: block; color: var(--accent); word-break: break-all; padding: 1px 0; }
+
+/* ── PER-FILE COLOR CARDS (merge) ── */
+.fcc-wrap { display: none; margin-bottom: 13px; }
+.fcc-wrap.on { display: block; }
+.fcc-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 2px;
+  color: var(--muted); text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.fcc {
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: 4px; padding: 11px 13px;
+  margin-bottom: 7px;
+}
+.fcc-name {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; color: var(--text);
+  margin-bottom: 8px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fcc-dot {
+  display: inline-block;
+  width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 7px; vertical-align: middle;
+  flex-shrink: 0;
+}
+.fcc-swatches { display: flex; flex-wrap: wrap; gap: 5px; }
+.msw {
+  width: 22px; height: 22px; border-radius: 3px;
+  cursor: pointer; border: 2px solid transparent;
+  transition: all .1s; position: relative; flex-shrink: 0;
+}
+.msw:hover { transform: scale(1.2); }
+.msw.on { border-color: rgba(255,255,255,.9); }
+.msw.on::after {
+  content: '✓';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: bold; color: rgba(0,0,0,.6);
+}
+
+/* ── FILENAME ROW ── */
+.fname-row {
+  display: flex; gap: 8px; align-items: flex-end; margin-bottom: 13px;
+}
+.fname-row .field { flex: 1; }
+.icon-btn {
+  background: none;
+  border: 1px solid var(--border2);
+  border-radius: 3px; padding: 0 12px;
+  height: 38px; flex-shrink: 0;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; color: var(--accent); cursor: pointer;
+  transition: border-color .15s;
+}
+.icon-btn:hover { border-color: var(--accent); }
+
+/* ── ACTION BUTTON ── */
+.btn-go {
+  width: 100%; padding: 18px;
+  background: var(--accent); color: #000;
+  border: none; border-radius: 5px;
+  font-family: 'Syne', sans-serif;
+  font-size: 15px; font-weight: 800;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  cursor: pointer; transition: opacity .15s;
+}
+.btn-go:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+.btn-go:not(:disabled):hover { opacity: .88; }
+
+/* ── PROGRESS ── */
+.prog { display: none; height: 2px; background: var(--border); margin-top: 12px; overflow: hidden; }
+.prog.on { display: block; }
+.prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--orange));
+  width: 0%; transition: width .25s;
+}
+
+/* ── ERROR ── */
+.err {
+  display: none; margin-top: 12px; padding: 12px;
+  background: rgba(255,56,96,.07);
+  border: 1px solid rgba(255,56,96,.3);
+  border-radius: 3px;
+  font-family: 'Space Mono', monospace; font-size: 10px; color: var(--err);
+}
+.err.on { display: block; }
+
+/* ── STATS ── */
+.stats { display: none; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 16px; }
+.stats.on { display: grid; }
+.stat {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 4px; padding: 12px; text-align: center;
+}
+.sv { font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; color: var(--accent); }
+.sl { font-size: 8px; color: var(--muted); text-transform: uppercase; margin-top: 4px; letter-spacing: 1px; }
+
+/* ── RESULT ── */
+.result {
+  display: none; margin-top: 14px; padding: 16px;
+  background: rgba(0,232,122,.05);
+  border: 1px solid rgba(0,232,122,.2);
+  border-radius: 5px; text-align: center;
+}
+.result.on { display: block; }
+.r-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; color: var(--ok); margin-bottom: 12px; letter-spacing: 1px;
+}
+.btn-dl {
+  display: inline-block; padding: 13px 30px;
+  background: transparent; color: var(--ok);
+  border: 2px solid var(--ok); border-radius: 4px;
+  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+  text-decoration: none; cursor: pointer; transition: background .15s;
+}
+.btn-dl:hover { background: rgba(0,232,122,.1); }
+
+/* ── RESET ── */
+.reset-link {
+  display: none; margin-top: 12px; text-align: center;
+  font-family: 'Space Mono', monospace; font-size: 9px;
+  color: var(--muted); cursor: pointer; text-decoration: underline;
+}
+
+/* ── FOOTER ── */
+.footer { margin-top: 40px; text-align: center; }
+.footer-note {
+  font-family: 'Space Mono', monospace;
+  font-size: 8px; color: var(--muted); letter-spacing: 2.5px; margin-bottom: 10px;
+}
+.creator { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); }
+.creator a { color: var(--accent); text-decoration: none; }
+.creator a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="badge">CHCNAV RS10</div>
+    <h1>TRAJ<em>→</em>KML</h1>
+    <p class="sub">// CONVERT · MERGE · RECOLOR · RUNS OFFLINE</p>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-mode="txt">📄 TXT → KML</button>
+    <button class="tab" data-mode="merge">🗺 Merge KML</button>
+    <button class="tab" data-mode="recolor">🎨 Recolor KML</button>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       PANEL: TXT → KML
+  ════════════════════════════════════════ -->
+  <div class="panel on" id="panel-txt">
+
+    <!-- Coordinate correction (collapsible) -->
+    <div class="card o">
+      <div class="card-head" onclick="toggle('corr')">
+        <span class="card-title orange">⚙ Coordinate Correction</span>
+        <span class="card-tog" id="corr-tog">[expand]</span>
+      </div>
+      <div class="card-body" id="corr-body">
+        <div class="off-grid">
+          <div class="field"><label>Lat Offset</label><input type="number" id="latOff" value="0" step="0.00001"></div>
+          <div class="field"><label>Lon Offset</label><input type="number" id="lonOff" value="0" step="0.00001"></div>
+          <div class="field"><label>Alt Offset (m)</label><input type="number" id="altOff" value="0" step="0.5"></div>
+        </div>
+        <button class="text-btn" onclick="resetOffsets()">↺ reset to zero</button>
+      </div>
+    </div>
+
+    <!-- Color picker -->
+    <div class="card c">
+      <div class="color-label">Line Color</div>
+      <div class="swatches" id="txt-sw"></div>
+    </div>
+
+    <!-- Drop zone -->
+    <div class="drop" id="txt-drop">
+      <span class="drop-icon">📡</span>
+      <div class="drop-title">Drop TXT file(s) here or tap to browse</div>
+      <div class="drop-sub">gnss_valid_trajectory.txt · single or multiple</div>
+      <input type="file" id="txt-inp" accept=".txt" multiple>
+    </div>
+    <div class="flist" id="txt-list"></div>
+
+    <!-- Filename -->
+    <div class="fname-row">
+      <div class="field">
+        <label>Output Filename</label>
+        <input type="text" id="txt-fname" value="RS10_output.kml">
+      </div>
+      <button class="icon-btn" onclick="byId('txt-fname').value='RS10_output.kml'">⟳ Default</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       PANEL: KML MERGE
+  ════════════════════════════════════════ -->
+  <div class="panel" id="panel-merge">
+
+    <!-- Drop zone -->
+    <div class="drop" id="merge-drop">
+      <span class="drop-icon">🗺</span>
+      <div class="drop-title">Drop KML file(s) here or tap to browse</div>
+      <div class="drop-sub">each file keeps its own separate lines — no cross-connections</div>
+      <input type="file" id="merge-inp" accept=".kml" multiple>
+    </div>
+
+    <!-- Per-file color assignment -->
+    <div class="fcc-wrap" id="fcc-wrap">
+      <div class="fcc-label">File Colors</div>
+      <div id="fcc-cards"></div>
+    </div>
+
+    <!-- Filename -->
+    <div class="fname-row">
+      <div class="field">
+        <label>Output Filename</label>
+        <input type="text" id="merge-fname" value="merged_output.kml">
+      </div>
+      <button class="icon-btn" onclick="byId('merge-fname').value='merged_output.kml'">⟳ Default</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       PANEL: RECOLOR KML
+  ════════════════════════════════════════ -->
+  <div class="panel" id="panel-recolor">
+
+    <!-- Drop zone -->
+    <div class="drop" id="recolor-drop">
+      <span class="drop-icon">🎨</span>
+      <div class="drop-title">Drop KML file(s) here or tap to browse</div>
+      <div class="drop-sub">replaces all line styles with your chosen color</div>
+      <input type="file" id="recolor-inp" accept=".kml" multiple>
+    </div>
+    <div class="flist" id="recolor-list"></div>
+
+    <!-- Color picker -->
+    <div class="card c">
+      <div class="color-label">New Line Color</div>
+      <div class="swatches" id="recolor-sw"></div>
+    </div>
+
+    <!-- Filename -->
+    <div class="fname-row">
+      <div class="field">
+        <label>Output Filename</label>
+        <input type="text" id="recolor-fname" value="recolored_output.kml">
+      </div>
+      <button class="icon-btn" onclick="byId('recolor-fname').value='recolored_output.kml'">⟳ Default</button>
+    </div>
+  </div>
+
+  <!-- ── SHARED: ACTION + OUTPUT ── -->
+  <button class="btn-go" id="btn-go" disabled>Convert / Process</button>
+  <div class="prog" id="prog"><div class="prog-fill" id="prog-fill"></div></div>
+  <div class="err" id="err"></div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="sv" id="s1v">—</div><div class="sl" id="s1l">—</div></div>
+    <div class="stat"><div class="sv" id="s2v">—</div><div class="sl" id="s2l">—</div></div>
+    <div class="stat"><div class="sv" id="s3v">—</div><div class="sl" id="s3l">—</div></div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="r-title">// FILE READY — OPEN IN GOOGLE EARTH</div>
+    <a class="btn-dl" id="btn-dl">⬇ Download KML</a>
+  </div>
+  <div class="reset-link" id="reset-link" onclick="resetAll()">← start over</div>
+
+  <div class="footer">
+    <div class="footer-note">NO INTERNET NEEDED · RUNS ON DEVICE · WORKS OFFLINE</div>
+    <div class="creator">DESIGNED &amp; BUILT BY <a href="https://t.me/eng_sahand" target="_blank" rel="noopener noreferrer">Eng. Sahand</a></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  COLOR PALETTE
+//  KML format: AABBGGRR  (alpha, blue, green, red)
+// ═══════════════════════════════════════════════════════
+const COLORS = [
+  { name:'Cyan',    css:'#00e5ff', kml:'ffffe500' },
+  { name:'Red',     css:'#ff3333', kml:'ff3333ff' },
+  { name:'Green',   css:'#00e870', kml:'ff70e800' },
+  { name:'Orange',  css:'#ff8c00', kml:'ff008cff' },
+  { name:'Yellow',  css:'#ffe033', kml:'ff33e0ff' },
+  { name:'Purple',  css:'#cc44ff', kml:'ffff44cc' },
+  { name:'White',   css:'#ffffff', kml:'ffffffff' },
+  { name:'Blue',    css:'#3399ff', kml:'ffff9933' },
+  { name:'Pink',    css:'#ff4dac', kml:'ffac4dff' },
+];
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let mode        = 'txt';
+let txtFiles    = [];
+let mergeFiles  = [];
+let recolorFiles= [];
+let txtColorIdx    = 0;
+let recolorColorIdx= 0;
+let fileColors  = [];   // index into COLORS per merge file
+
+// ═══════════════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════════════
+const byId = id => document.getElementById(id);
+
+function ensureKml(n) {
+  n = (n || '').trim() || 'output.kml';
+  if (!n.toLowerCase().endsWith('.kml')) n += '.kml';
+  return n;
+}
+
+function readFile(f) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = e => res(e.target.result);
+    r.onerror = () => rej(new Error(`Cannot read ${f.name}`));
+    r.readAsText(f);
+  });
+}
+
+function resetOffsets() {
+  ['latOff','lonOff','altOff'].forEach(id => { byId(id).value = 0; });
+}
+
+function toggle(id) {
+  const body = byId(id + '-body');
+  const tog  = byId(id + '-tog');
+  const open = body.classList.toggle('open');
+  tog.textContent = open ? '[collapse]' : '[expand]';
+}
+
+// ═══════════════════════════════════════════════════════
+//  BUILD SWATCHES
+// ═══════════════════════════════════════════════════════
+function buildSwatches(containerId, selIdx, onChange) {
+  const el = byId(containerId);
+  el.innerHTML = '';
+  COLORS.forEach((c, i) => {
+    const s = document.createElement('div');
+    s.className = 'sw' + (i === selIdx ? ' on' : '');
+    s.style.background = c.css;
+    s.title = c.name;
+    s.addEventListener('click', () => {
+      el.querySelectorAll('.sw').forEach(x => x.classList.remove('on'));
+      s.classList.add('on');
+      onChange(i);
+    });
+    el.appendChild(s);
+  });
+}
+
+function buildMiniSwatches(container, fileIdx, defColorIdx) {
+  container.innerHTML = '';
+  COLORS.forEach((c, ci) => {
+    const s = document.createElement('div');
+    s.className = 'msw' + (ci === defColorIdx ? ' on' : '');
+    s.style.background = c.css;
+    s.title = c.name;
+    s.addEventListener('click', () => {
+      container.querySelectorAll('.msw').forEach(x => x.classList.remove('on'));
+      s.classList.add('on');
+      fileColors[fileIdx] = ci;
+      // Update color dot in header
+      const dot = container.closest('.fcc').querySelector('.fcc-dot');
+      if (dot) dot.style.background = c.css;
+    });
+    container.appendChild(s);
+  });
+}
+
+// Init global swatches
+buildSwatches('txt-sw',     txtColorIdx,     i => { txtColorIdx = i; });
+buildSwatches('recolor-sw', recolorColorIdx, i => { recolorColorIdx = i; });
+
+// ═══════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════
+byId('tabs').querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    byId('tabs').querySelectorAll('.tab').forEach(b => b.classList.remove('on'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
+    btn.classList.add('on');
+    mode = btn.dataset.mode;
+    byId('panel-' + mode).classList.add('on');
+    hideOutput();
+    updateBtn();
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+//  FILE HANDLING — TXT
+// ═══════════════════════════════════════════════════════
+const txtDrop = byId('txt-drop');
+const txtInp  = byId('txt-inp');
+
+txtDrop.addEventListener('click', () => txtInp.click());
+txtDrop.addEventListener('dragover',  e => { e.preventDefault(); txtDrop.classList.add('over'); });
+txtDrop.addEventListener('dragleave', () => txtDrop.classList.remove('over'));
+txtDrop.addEventListener('drop', e => {
+  e.preventDefault(); txtDrop.classList.remove('over');
+  const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.txt'));
+  if (files.length) setTxtFiles(files);
+});
+txtInp.addEventListener('change', e => {
+  if (e.target.files.length) setTxtFiles(Array.from(e.target.files));
+});
+
+function setTxtFiles(files) {
+  txtFiles = files;
+  txtDrop.classList.add('got');
+  const el = byId('txt-list');
+  el.style.display = 'block';
+  el.innerHTML = `<span>📁 ${files.length} file(s) loaded</span>` +
+    files.map(f => `<span>· ${f.name}</span>`).join('');
+  hideOutput(); updateBtn();
+}
+
+// ═══════════════════════════════════════════════════════
+//  FILE HANDLING — MERGE
+// ═══════════════════════════════════════════════════════
+const mergeDrop = byId('merge-drop');
+const mergeInp  = byId('merge-inp');
+
+mergeDrop.addEventListener('click', () => mergeInp.click());
+mergeDrop.addEventListener('dragover',  e => { e.preventDefault(); mergeDrop.classList.add('over'); });
+mergeDrop.addEventListener('dragleave', () => mergeDrop.classList.remove('over'));
+mergeDrop.addEventListener('drop', e => {
+  e.preventDefault(); mergeDrop.classList.remove('over');
+  const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.kml'));
+  if (files.length) setMergeFiles(files);
+});
+mergeInp.addEventListener('change', e => {
+  if (e.target.files.length) setMergeFiles(Array.from(e.target.files));
+});
+
+function setMergeFiles(files) {
+  mergeFiles = files;
+  fileColors = files.map((_, i) => i % COLORS.length); // auto-cycle default colors
+  mergeDrop.classList.add('got');
+
+  const wrap  = byId('fcc-wrap');
+  const cards = byId('fcc-cards');
+  wrap.classList.add('on');
+  cards.innerHTML = '';
+
+  files.forEach((f, i) => {
+    const card = document.createElement('div');
+    card.className = 'fcc';
+
+    const name = document.createElement('div');
+    name.className = 'fcc-name';
+    const dot = document.createElement('span');
+    dot.className = 'fcc-dot';
+    dot.style.background = COLORS[fileColors[i]].css;
+    name.appendChild(dot);
+    name.appendChild(document.createTextNode(f.name));
+
+    const sw = document.createElement('div');
+    sw.className = 'fcc-swatches';
+    buildMiniSwatches(sw, i, fileColors[i]);
+
+    card.appendChild(name);
+    card.appendChild(sw);
+    cards.appendChild(card);
+  });
+
+  hideOutput(); updateBtn();
+}
+
+// ═══════════════════════════════════════════════════════
+//  FILE HANDLING — RECOLOR
+// ═══════════════════════════════════════════════════════
+const recolorDrop = byId('recolor-drop');
+const recolorInp  = byId('recolor-inp');
+
+recolorDrop.addEventListener('click', () => recolorInp.click());
+recolorDrop.addEventListener('dragover',  e => { e.preventDefault(); recolorDrop.classList.add('over'); });
+recolorDrop.addEventListener('dragleave', () => recolorDrop.classList.remove('over'));
+recolorDrop.addEventListener('drop', e => {
+  e.preventDefault(); recolorDrop.classList.remove('over');
+  const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.kml'));
+  if (files.length) setRecolorFiles(files);
+});
+recolorInp.addEventListener('change', e => {
+  if (e.target.files.length) setRecolorFiles(Array.from(e.target.files));
+});
+
+function setRecolorFiles(files) {
+  recolorFiles = files;
+  recolorDrop.classList.add('got');
+  const el = byId('recolor-list');
+  el.style.display = 'block';
+  el.innerHTML = `<span>🎨 ${files.length} file(s) loaded</span>` +
+    files.map(f => `<span>· ${f.name}</span>`).join('');
+  hideOutput(); updateBtn();
+}
+
+// ═══════════════════════════════════════════════════════
+//  BUTTON STATE
+// ═══════════════════════════════════════════════════════
+function updateBtn() {
+  const btn = byId('btn-go');
+  const ready = {
+    txt:     txtFiles.length     > 0,
+    merge:   mergeFiles.length   > 0,
+    recolor: recolorFiles.length > 0,
+  }[mode];
+  btn.disabled = !ready;
+  btn.textContent = {
+    txt:    'Convert to KML',
+    merge:  'Merge KML Files',
+    recolor:'Recolor & Download',
+  }[mode];
+}
+
+// ═══════════════════════════════════════════════════════
+//  RUN
+// ═══════════════════════════════════════════════════════
+byId('btn-go').addEventListener('click', run);
+
+async function run() {
+  const btn  = byId('btn-go');
+  const prog = byId('prog');
+  const fill = byId('prog-fill');
+  const err  = byId('err');
+
+  btn.disabled = true;
+  btn.textContent = 'Processing…';
+  prog.classList.add('on');
+  fill.style.width = '15%';
+  err.classList.remove('on');
+  hideOutput();
+
+  try {
+    let result;
+    fill.style.width = '40%';
+
+    if      (mode === 'txt')     result = await doTxt();
+    else if (mode === 'merge')   result = await doMerge();
+    else                         result = await doRecolor();
+
+    fill.style.width = '100%';
+    showResult(result);
+    btn.textContent = 'Done ✓';
+    byId('reset-link').style.display = 'block';
+
+  } catch(e) {
+    err.textContent = '⚠ ' + e.message;
+    err.classList.add('on');
+    updateBtn();
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { prog.classList.remove('on'); fill.style.width = '0%'; }, 900);
+  }
+}
+
+function showResult({ kml, filename, s1, s2, s3 }) {
+  byId('s1v').textContent = s1.v; byId('s1l').textContent = s1.l;
+  byId('s2v').textContent = s2.v; byId('s2l').textContent = s2.l;
+  byId('s3v').textContent = s3.v; byId('s3l').textContent = s3.l;
+  byId('stats').classList.add('on');
+
+  const blob = new Blob([kml], { type:'application/vnd.google-earth.kml+xml' });
+  const a = byId('btn-dl');
+  if (a._url) URL.revokeObjectURL(a._url);
+  a._url = URL.createObjectURL(blob);
+  a.href = a._url;
+  a.download = ensureKml(filename);
+  byId('result').classList.add('on');
+}
+
+function hideOutput() {
+  ['result','stats','err'].forEach(id => byId(id).classList.remove('on'));
+  byId('reset-link').style.display = 'none';
+}
+
+function resetAll() {
+  txtFiles = []; mergeFiles = []; recolorFiles = []; fileColors = [];
+  ['txt-inp','merge-inp','recolor-inp'].forEach(id => { byId(id).value = ''; });
+  ['txt-drop','merge-drop','recolor-drop'].forEach(id => byId(id).classList.remove('got','over'));
+  byId('txt-list').style.display    = 'none';
+  byId('recolor-list').style.display= 'none';
+  byId('fcc-wrap').classList.remove('on');
+  byId('fcc-cards').innerHTML = '';
+  hideOutput(); updateBtn();
+}
+
+// ═══════════════════════════════════════════════════════
+//  MODE 1: TXT → KML
+// ═══════════════════════════════════════════════════════
+async function doTxt() {
+  const latOff = parseFloat(byId('latOff').value) || 0;
+  const lonOff = parseFloat(byId('lonOff').value) || 0;
+  const altOff = parseFloat(byId('altOff').value) || 0;
+  const color  = COLORS[txtColorIdx].kml;
+  const fname  = byId('txt-fname').value;
+  const CHUNK  = 5000;
+
+  let tracks = [], totalPts = 0;
+
+  for (const file of txtFiles) {
+    const text = await readFile(file);
+    let pts = [];
+    for (const line of text.trim().split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      const p = line.trim().split(/\s+/);
+      if (p.length < 5) continue;
+      const ts = parseFloat(p[1]),
+            lon= parseFloat(p[2]) + lonOff,
+            lat= parseFloat(p[3]) + latOff,
+            alt= parseFloat(p[4]) + altOff;
+      if ([ts,lon,lat,alt].some(isNaN)) continue;
+      pts.push({ ts, lon, lat, alt });
+    }
+    if (!pts.length) continue;
+    pts.sort((a,b) => a.ts - b.ts);
+    tracks.push({ name: file.name.replace(/\.txt$/i,''), pts });
+    totalPts += pts.length;
+  }
+
+  if (!totalPts) throw new Error('No valid points found in TXT files.');
+
+  const allAlts = tracks.flatMap(t => t.pts.map(p => p.alt));
+  const avgAlt  = (allAlts.reduce((s,v)=>s+v,0) / allAlts.length).toFixed(0);
+  const allTs   = tracks.flatMap(t => t.pts.map(p => p.ts));
+  const dur     = ((Math.max(...allTs) - Math.min(...allTs)) / 60).toFixed(1);
+
+  let pms = [];
+
+  tracks.forEach((trk, ti) => {
+    const n = ti + 1;
+    // Segments
+    for (let i = 0; i < trk.pts.length; i += CHUNK) {
+      const chunk = trk.pts.slice(i, i + CHUNK);
+      const coords = chunk.map(p => `        ${p.lon},${p.lat},${p.alt}`).join('\n');
+      pms.push(`  <Placemark>
+    <name>Track ${n} · Seg ${Math.floor(i/CHUNK)+1}</name>
+    <Style><LineStyle><color>${color}</color><width>4</width></LineStyle></Style>
+    <LineString>
+      <tessellate>1</tessellate>
+      <altitudeMode>clampToGround</altitudeMode>
+      <coordinates>
+${coords}
+      </coordinates>
+    </LineString>
+  </Placemark>`);
+    }
+    // Pins
+    const s = trk.pts[0], e = trk.pts[trk.pts.length-1];
+    pms.push(`  <Placemark>
+    <name>Track ${n} · Start</name>
+    <Style><IconStyle><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/grn-pushpin.png</href></Icon></IconStyle></Style>
+    <Point><altitudeMode>clampToGround</altitudeMode><coordinates>${s.lon},${s.lat},${s.alt}</coordinates></Point>
+  </Placemark>`);
+    pms.push(`  <Placemark>
+    <name>Track ${n} · End</name>
+    <Style><IconStyle><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/red-pushpin.png</href></Icon></IconStyle></Style>
+    <Point><altitudeMode>clampToGround</altitudeMode><coordinates>${e.lon},${e.lat},${e.alt}</coordinates></Point>
+  </Placemark>`);
+  });
+
+  return {
+    filename: fname,
+    kml: kmlDoc(`RS10 Trajectories (${tracks.length} tracks)`,
+                `${totalPts} points · ${tracks.length} tracks · alt offset: ${altOff}m`,
+                pms),
+    s1: { v: totalPts.toLocaleString(), l: 'Total Points' },
+    s2: { v: dur + ' min',              l: 'Duration' },
+    s3: { v: avgAlt + ' m',             l: 'Avg Alt' },
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+//  MODE 2: KML MERGE — FOLDER TREE & ID FIX
+// ═══════════════════════════════════════════════════════
+async function doMerge() {
+  const fname = byId('merge-fname').value;
+  let folders = [], totalPts = 0, segCount = 0; 
+
+  for (let fi = 0; fi < mergeFiles.length; fi++) {
+    const file  = mergeFiles[fi];
+    const color = COLORS[fileColors[fi] ?? fi % COLORS.length].kml;
+    const text  = await readFile(file);
+
+    let filePms = []; 
+
+    // Extract every <Placemark>...</Placemark> independently
+    const rx = /<Placemark[\s\S]*?<\/Placemark>/gi;
+    let m;
+    while ((m = rx.exec(text)) !== null) {
+      let block = m[0];
+
+      // Strip any 'id' attributes from Placemark tags. 
+      // This prevents Google Earth from deleting paths that share the same ID.
+      block = block.replace(/<Placemark[^>]*>/i, '<Placemark>');
+
+      if (/<LineString/i.test(block)) {
+        // Count coords in this specific Placemark
+        const cm = block.match(/<coordinates>([\s\S]*?)<\/coordinates>/i);
+        if (cm) {
+          totalPts += cm[1].trim().split(/\s+/).filter(Boolean).length;
+        }
+        
+        // Strip any existing style or styleUrl, inject chosen color
+        block = block
+          .replace(/<Style[\s\S]*?<\/Style>/gi, '')
+          .replace(/<styleUrl>[^<]*<\/styleUrl>/gi, '');
+        block = block.replace(
+          '</Placemark>',
+          `  <Style><LineStyle><color>${color}</color><width>4</width></LineStyle></Style>\n  </Placemark>`
+        );
+        
+        filePms.push(block);
+        segCount++;
+
+      } else if (/<Point/i.test(block)) {
+        // Preserve markers (start/end pins) as-is
+        filePms.push(block);
+      }
+    }
+
+    // Wrap this file's placemarks in a KML <Folder>
+    // This creates the clean "Tree" structure in Google Earth.
+    if (filePms.length > 0) {
+      const folderName = file.name.replace(/\.kml$/i, ''); 
+      folders.push(`
+      <Folder>
+        <name>${folderName}</name>
+        ${filePms.join('\n')}
+      </Folder>`);
+    }
+  }
+
+  if (!segCount) throw new Error('No LineString placemarks found in selected KML files.');
+
+  return {
+    filename: fname,
+    kml: kmlDoc(
+      `Merged KML (${mergeFiles.length} files)`,
+      `${segCount} segments · ${totalPts.toLocaleString()} points · ${mergeFiles.length} files`,
+      folders 
+    ),
+    s1: { v: mergeFiles.length,            l: 'Files Merged'   },
+    s2: { v: segCount,                     l: 'Line Segments'   },
+    s3: { v: totalPts.toLocaleString(),    l: 'Total Points'    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+//  MODE 3: KML RECOLOR
+// ═══════════════════════════════════════════════════════
+async function doRecolor() {
+  const color = COLORS[recolorColorIdx].kml;
+  const fname = byId('recolor-fname').value;
+  let pms = [], recolored = 0;
+
+  for (const file of recolorFiles) {
+    const text = await readFile(file);
+    const rx   = /<Placemark[\s\S]*?<\/Placemark>/gi;
+    let m;
+    while ((m = rx.exec(text)) !== null) {
+      let block = m[0];
+      if (/<LineString/i.test(block)) {
+        // Strip all existing styles, inject new color inline
+        block = block
+          .replace(/<Style[\s\S]*?<\/Style>/gi, '')
+          .replace(/<styleUrl>[^<]*<\/styleUrl>/gi, '');
+        block = block.replace(
+          '</Placemark>',
+          `  <Style><LineStyle><color>${color}</color><width>4</width></LineStyle></Style>\n  </Placemark>`
+        );
+        pms.push(block);
+        recolored++;
+      } else {
+        pms.push(block); // keep Points, etc.
+      }
+    }
+  }
+
+  if (!recolored) throw new Error('No LineString placemarks found.');
+
+  return {
+    filename: fname,
+    kml: kmlDoc(
+      'Recolored KML',
+      `${recolored} segments recolored → ${COLORS[recolorColorIdx].name}`,
+      pms
+    ),
+    s1: { v: recolorFiles.length,       l: 'Files Processed' },
+    s2: { v: recolored,                 l: 'Segs Recolored'  },
+    s3: { v: COLORS[recolorColorIdx].name, l: 'New Color'    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+//  KML DOCUMENT WRAPPER
+// ═══════════════════════════════════════════════════════
+function kmlDoc(name, desc, placemarks) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${name}</name>
+    <description>${desc}</description>
+${placemarks.join('\n')}
+  </Document>
+</kml>`;
+}
+
+// ── init ──
+updateBtn();
+</script>
+</body>
+</html>
